@@ -10,7 +10,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from pylab import rand
 import random
-sampleSize = 100
+sampleSize = 2000
 imageSize = 20*20
 
 class GenerateData:
@@ -71,49 +71,26 @@ class GenerateData:
         return self.x[i,]      
 
 
-
-
-if __name__ == '__main__':
-    
-    data = GenerateData()
-    data.GenerateFinaldata()
-    a = np.reshape(data.x[3], (20,20))
-  
-    cv2.imshow('image',a)
-    cv2.waitKey(3000)
-    
-    #use 60% of the dataset as training set with corresponding desired output set
-#    trainingSet = np.hstack((data.x[0:sampleSize*0.6], data.y[0:sampleSize*0.6]))
-#    print trainingSet.shape
-
-    # Create the dataset based on input matrix x and output vector y in numpy form
+# Creates the dataset based on pybrain data structures         
+def createDataSet(data):
+    # Input matrix x and output vector y in numpy form
     dataSet = np.zeros((data.x[0:sampleSize].shape[0], data.x[0:sampleSize].shape[1]+1))
     dataSet[:,0:imageSize] = data.x[0:sampleSize]
     dataSet[:,-1] = data.y[0:sampleSize]
     
-    # Transform the dataset into a pybrain classification dataset ("input", "target")
-    x = dataSet[3]
-    #print len(list(x[0:imageSize]))
     # Data set classification configuration
     ds = ClassificationDataSet(imageSize, 1, nb_classes= 2, class_labels=['Tank', 'Castle'])
     for x in dataSet:
         #all but last column is input, last element is the desired output aka. "target"
         ds.addSample(list(x[0:imageSize]), x[-1])
-    # Split the data into 60% training set and 40% testing set
-    testSet, trainingSet = ds.splitWithProportion(0.4)
-    # One-vs-all output scheme suitable for classification on both sets
-    trainingSet._convertToOneOfMany()
-    testSet._convertToOneOfMany()
-    # Debug printing
-    print "Number of training patterns:", len(trainingSet)
-    
-    
-     
-    #create the feedforward network with 5->3->2 connection
+    return ds
+
+# Creates a fully connected three layer feed forward network
+def createFFN(inputNum, hiddenNum, outputNum):
     n = FeedForwardNetwork()
-    inLayer = LinearLayer(imageSize)
-    hiddenLayer = SigmoidLayer(35) 
-    outLayer = LinearLayer(2)
+    inLayer = LinearLayer(inputNum)
+    hiddenLayer = SigmoidLayer(hiddenNum) 
+    outLayer = LinearLayer(outputNum)
     #add to the proper modules network
     n.addInputModule(inLayer)
     n.addModule(hiddenLayer)
@@ -126,31 +103,59 @@ if __name__ == '__main__':
     n.addConnection(hiddenOutLayer)
     #internal net initialization
     n.sortModules()
-#    print n.activate(trainingSet[3])
+    return n
+    
 
+if __name__ == '__main__':
+    
+    data = GenerateData()
+    data.GenerateFinaldata()
+
+    # Transform the dataset into a pybrain classification dataset ("input", "target")
+    ds = createDataSet(data)
+    # Split the data into 60% training set and 40% testing set
+    testSet, trainingSet = ds.splitWithProportion(0.4)
+    # One-vs-all output scheme suitable for classification on both sets
+    trainingSet._convertToOneOfMany()
+    testSet._convertToOneOfMany()
+    # Debug printing
+    print "Number of training patterns:", len(trainingSet)
+    #create the feedforward network with input(imageSize)->hidden(20)->output(2) layer connection
+    n = createFFN(imageSize, 20, 2)
+    
+    
     
     # Shortcut build method of the ANN
 #    n = buildNetwork( trainingSet.indim, 5, trainingSet.outdim, outclass=SoftmaxLayer)
-    # Construct the trainer object (using backprop)
-    trainer = BackpropTrainer(n, dataset=trainingSet, learningrate=0.01, verbose=True, weightdecay=0.00)
-    # Start the training iterations
     
+    # Construct the trainer object (using backprop)
+    trainer = BackpropTrainer(n, dataset=trainingSet, learningrate=0.1, verbose=True, weightdecay=0.00)
+    
+    # Start the training iterations
     for i in xrange(30):
         #one epoche or pattern at a time
-        trainer.trainEpochs(5)
+        trainer.trainEpochs(1)
         #classification of one-vs-all with precent error
         trainResult = percentError( trainer.testOnClassData(), trainingSet['class'] )
         testResult = percentError( trainer.testOnClassData(dataset=testSet), testSet['class'] )
         print "Pattern: %4d" % trainer.totalepochs
         print " train error: %5.2f%%" % trainResult
         print " test error: %5.2f%%" % testResult
+    
+    # Testing the network
+    for i in xrange(1,20):
+        testData = data.x[i]
+        a = np.reshape(testData, (20,20))
+        cv2.imshow('image',a)
+        cv2.waitKey(3000)
+        b = np.multiply(n.params[0:400],testData.T)
+        b = np.reshape(b, (20,20))
+        cv2.imshow('image',b)
+        cv2.waitKey(3000)
+        answer = np.argmax(n.activate(testData))
+        if answer:
+            print "Tank"
+        else:
+            print "Castle"
    
             
-
-
-#    
-
-#    n.sortModules()
-#    print data.x[0:sampleSize*0.6].shape
-#    n.activate(data.x)
-#    print n.in_to_hidden.params
