@@ -1,11 +1,12 @@
 from threshold import *
+import math
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 import pylab
 
-image = 'ColposcopyImages/1/2.jpg'
-image = 'endo.jpg'
+#image = 'ColposcopyImages/2/1.jpg'
+image = 'colitis2.jpg'
 
 
 
@@ -53,22 +54,31 @@ def endoSegmentv1(image):
 def contArea(im, threshImage):
     print im.size
     contourImage = np.copy(threshImage)
-    temp = np.copy(threshImage)
+    smallCont = np.copy(threshImage)
+    medCont = np.copy(threshImage)
+    largeCont = np.copy(threshImage)
     contours, hierachy = cv2.findContours(contourImage, cv2.RETR_EXTERNAL ,cv2.CHAIN_APPROX_SIMPLE)      
-    contList = []
-    badList = []
+    smallList = []
+    medList = []
+    largeList = []
     for i in xrange(len(contours)):
-        if(math.fabs((cv2.arcLength(contours[i], True)) <= im.size/8000)):
+        if(math.fabs((cv2.arcLength(contours[i], True)) <= im.size/4000)):
 #        if((cv2.contourArea(contours[i])) > im.size/200):
-            contList.append(contours[i])
-        elif(math.fabs((cv2.arcLength(contours[i], True)) > im.size/8000)): #and (cv2.arcLength(contours[i], True) <= 1000000000000000))):
-            badList.append(contours[i])
+            largeList.append(contours[i])
+        elif(math.fabs((cv2.arcLength(contours[i], True)) > im.size/7500 and math.fabs((cv2.arcLength(contours[i], True)) <= im.size/6000))): #and (cv2.arcLength(contours[i], True) <= 1000000000000000))):
+            medList.append(contours[i])
+        elif(math.fabs((cv2.arcLength(contours[i], True)) > im.size/6000) and math.fabs((cv2.arcLength(contours[i], True)) <= im.size/5000)):
+            smallList.append(contours[i])
     
-    print len(badList), len(contours), len(contList)
+    print "Small contours:", len(smallList)
+    print "Medium contours:", len(medList)
+    print "Large contours:", len(largeList)
+    print "Total contours:", len(contours)
 
-    cv2.drawContours(threshImage, contList, -1, (0,255,0), -1)
-    cv2.drawContours(temp, badList, -1, (0,255,0), -1) 
-    return temp
+    cv2.drawContours(smallCont, smallList, -1, (0,0,0), -1)
+    cv2.drawContours(medCont, medList, -1, (0,255,0), -1)
+    cv2.drawContours(largeCont, largeList, -1, (0,255,0), -1)
+    return smallCont, medCont, largeCont
 
 def endoSegmentv2(image):
     #read Image 
@@ -81,16 +91,25 @@ def endoSegmentv2(image):
     #work with the green image
     finalImage = greenImage
     #global thresholding
-    ret, finalImage = cv2.threshold(finalImage, 170, 255, cv2.THRESH_BINARY)
+    ret, finalImage = cv2.threshold(finalImage, 190, 255, cv2.THRESH_BINARY)
+    tempImage = finalImage
+    smallCont, medCont, largeCont = contArea(greenImage, finalImage)
     
-    finalImage = contArea(greenImage, finalImage)
-    tempImage = np.copy(finalImage)
-#    tempImage = np.copy(finalImage)
-    dilateKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
-    finalImage = cv2.dilate(finalImage, kernel=dilateKernel, iterations=7)
-#    finalImage = cv2.inpaint(im, finalImage, inpaintRadius=10, flags=cv2.INPAINT_TELEA)  
-    return finalImage, tempImage
 
+#    dilateKernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+#    tempImage = cv2.dilate(largeCont, kernel=dilateKernel, iterations=4)
+#    tempImage = cv2.inpaint(im, finalImage, inpaintRadius=7, flags=cv2.INPAINT_TELEA) 
+    
+    dilateKernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6,6))
+    finalImage = cv2.dilate(smallCont, kernel=dilateKernel, iterations=2)
+    finalImage = cv2.inpaint(im, finalImage, inpaintRadius=8, flags=cv2.INPAINT_TELEA)
+ 
+    return smallCont, largeCont
+
+
+#def inpaintTelea(image, inpaintRadius):
+#    return cv2.inpaint(image, finalImage, inpaintRadius=inpaintRadius, flags=cv2.INPAINT_TELEA)
+    
      
 def plotPretty(rowNumber, columnNumber, windowNumber, windowTitle, array):
     plt.subplot(rowNumber,columnNumber,windowNumber)
@@ -102,7 +121,11 @@ if __name__ == '__main__':
 
     im = plt.imread(image)
     #run endo segmentation algoritm8
-    finalImage, grayImage = endoSegmentv1(image)
+    finalImage, largeCont =  endoSegmentv2(image)
+    
+#    dilateKernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7,7))
+#    tempImage = cv2.dilate(largeCont, kernel=dilateKernel, iterations=2)
+#    finalImage = cv2.inpaint(finalImage, tempImage, inpaintRadius=30, flags=cv2.INPAINT_TELEA)
     
 #    #show the images 
     plt.gray()
@@ -114,7 +137,7 @@ if __name__ == '__main__':
     
     plt.subplot(1,2,2)
     plt.title("b) Imagen Final del Algoritmo")
-    plt.imshow(finalImage, origin='upper')
+    plt.imshow(finalImage, origin='lower')
     plt.axis('off')
 
     plt.colors()

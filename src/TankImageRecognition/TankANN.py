@@ -107,6 +107,10 @@ def createFFN(inputNum, hiddenNum, outputNum):
     
 
 if __name__ == '__main__':
+    testResultList = []
+    trainResultList = []
+    resultFile = open('TankResult.data','w')
+    
     
     data = GenerateData()
     data.GenerateFinaldata()
@@ -121,26 +125,40 @@ if __name__ == '__main__':
     # Debug printing
     print "Number of training patterns:", len(trainingSet)
     #create the feedforward network with input(imageSize)->hidden(20)->output(2) layer connection
-    n = createFFN(imageSize, 20, 2)
+#    n = createFFN(imageSize, 20, 2)
     
-    
+    iter = 0
     
     # Shortcut build method of the ANN
-#    n = buildNetwork( trainingSet.indim, 5, trainingSet.outdim, outclass=SoftmaxLayer)
+    n = buildNetwork( trainingSet.indim, 5, trainingSet.outdim, outclass=SoftmaxLayer)
     
     # Construct the trainer object (using backprop)
     trainer = BackpropTrainer(n, dataset=trainingSet, learningrate=0.1, verbose=True, weightdecay=0.00)
     
     # Start the training iterations
-    for i in xrange(30):
+    for i in xrange(20):
         #one epoche or pattern at a time
-        trainer.trainEpochs(1)
+        trainer.trainEpochs(5)
         #classification of one-vs-all with precent error
         trainResult = percentError( trainer.testOnClassData(), trainingSet['class'] )
         testResult = percentError( trainer.testOnClassData(dataset=testSet), testSet['class'] )
-        print "Pattern: %4d" % trainer.totalepochs
-        print " train error: %5.2f%%" % trainResult
-        print " test error: %5.2f%%" % testResult
+#        print "Pattern: %4d" % trainer.totalepochs
+#        print " train error: %5.2f%%" % trainResult
+#        print " test error: %5.2f%%" % testResult
+        #store the results in their appropriate lists
+        trainResultList.append(trainResult)
+        testResultList.append(testResult)
+    
+    #write into a file
+    for train in trainResultList:
+        print>>resultFile, iter, train, "a"
+        iter = iter + 1
+    
+    iter = 0    
+    for test in testResultList:
+        print>>resultFile, iter, test, "b"
+        iter = iter + 1
+    resultFile.close()
     
     # Testing the network
     for i in xrange(1,20):
@@ -157,5 +175,3 @@ if __name__ == '__main__':
             print "Tank"
         else:
             print "Castle"
-   
-            
